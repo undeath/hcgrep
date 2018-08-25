@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+from copy import copy
+
+
+CHARACTER_CLASSES = {
+    'l': 'a-z',
+    'u': 'A-Z',
+    'd': '0-9',
+    'h': 'a-f0-9',
+    'H': 'A-F0-9',
+    's': ' [:punct:]',
+    'a': ' [:graph:]',
+    'b': '.',
+    '?': '?',
+}
+
+
+GREP_EXECUTABLE = 'grep'
+
+
+class ParseException(Exception):
+    pass
+
+
+class HcCharacterClass:
+    def __init__(self, identifier):
+        self.i = identifier
+
+    def __str__(self):
+        return '?' + self.i
+
+    def __eq__(self, o):
+        return isinstance(o, type(self)) and self.i == o.i
+
+    def __hash__(self):
+        return hash(self.i)
+
+
+class HcMask:
+    def __init__(self):
+        self.positions = []
+
+    def push(self, character_class):
+        self.positions.append(character_class)
+
+    def __str__(self):
+        return ''.join(str(x) for x in self.positions)
+
+    def __repr__(self):
+        return repr(list(str(x) for x in self.positions))
+
+    def to_regex(self, classes=CHARACTER_CLASSES):
+        occurence_list = self.get_occurences()
+        result = []
+
+        for o, i in occurence_list:
+            cclass = self.get_character_class(o, classes)
+
+            if cclass != '.' or o == '.':
+                cclass = '[' + cclass + ']'
+
+            if i == 1:
+                result.append(cclass)
+            else:
+                result.append(cclass + '\{' + str(i) + '\}')
+
+        return ''.join(result)
+
+    def get_occurences(self):
+        entries = []
+        last = None
+        for p in self.positions:
+            assert isinstance(p, (str, HcCharacterClass))
+            if p == last:
+                entries[-1][1] += 1
+            else:
+                entries.append([p, 1])
+                last = p
+        return entries
+
+    @staticmethod
+    def get_character_class(o, classes):
+        if isinstance(o, HcCharacterClass):
+            return classes[o.i]
+        else:
+            assert isinstance(o, str)
+            return o
+
+
+def mask_to_charset(hcmask):
+    charset = set(hcmask.positions)
+    hcset = []
+    for x in list(charset):
+        hcset.append(HcMask.get_character_class(x, classes=CHARACTER_CLASSES))
+
+    if ']' in hcset:
+        hcset.remove(']')
+        hcset.insert(0, ']')
+
+    for c in '^-':
+        if c in hcset:
+            hcset.remove(c)
+            hcset.append(c)
+
+    return ''.join(hcset)
+
+
+def parse_mask(mstring, classes=CHARACTER_CLASSES):
+    mask = HcMask()
+    miter = iter(mstring)
+    for c in miter:
+        if c == '?':
+            try:
+                character_class = next(miter)
+            except StopIteration:
+                raise ParseException("unexpected end for mask")
+            if character_class not in classes:
+                raise ParseException("Invalid character class in mask: '{}'"
+                                     .format(character_class))
+            mask.push(HcCharacterClass(character_class))
+        else:
+            mask.push(c)
+    return mask
+
+
+def parse_character_set(mstring):
+    mask = parse_mask(mstring)
+    return mask_to_charset(mask)
+
+
+def apply_match_mode(regex, mode):
+    if mode == 'a':
+        return regex
+    elif mode == 'f':
+        return '^' + regex + '$'
+    elif mode == 's':
+        return '^' + regex
+    elif mode == 'e':
+        return regex + '$'
+    else:
+        raise Exception("Internal error: unknown match mode")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run grep with a hashcat mask", allow_abbrev=False,
+        epilog="Any desired grep options can be appended to the command line")
+    parser.add_argument(
+        '--mask-match-mode', '--mm', required=False, choices='afse',
+        default='f', help="desired matching mode, [a]ny, [f]ull, [s]tart, "
+                          "[e]nd. Default: f")
+    for i in range(1, 5):
+        i = str(i)
+        parser.add_argument('--custom-charset' + i, '-' + i)
+    parser.add_argument('mask')
+
+    args, grep_args = parser.parse_known_args()
+
+    charsets = copy(CHARACTER_CLASSES)
+
+    for i in range(1, 5):
+        i = str(i)
+        cust = getattr(args, 'custom_charset' + i)
+        if cust:
+            charsets[i] = parse_character_set(cust)
+
+    mask = args.mask
+
+    hcmask = parse_mask(mask, classes=charsets)
+
+    regex = hcmask.to_regex(classes=charsets)
+    regex = apply_match_mode(regex, args.mask_match_mode)
+
+    env = os.environ.copy()
+    env['LC_ALL'] = 'C'
+    os.execlpe(GREP_EXECUTABLE, 'grep', regex, *grep_args, env)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except ParseException as e:
+        print(1, '{}: {}\n'.format(type(e).__name__, str(e)))
+        exit(1)
