@@ -4,7 +4,7 @@ hcgrep allows using grep with [hashcat mask](https://hashcat.net/wiki/doku.php?i
 
 ## Usage
 
-hcgrep works just like grep with hashcat masks. Most grep options work, altough some do not make sense or may break hcgrep's fuctionality.
+hcgrep works just like grep with hashcat masks. Most grep options work, altough some do not make sense or may break hcgrep's functionality.
 
 
 	usage: hcgrep [-h] [--mask-match-mode {a,f,s,e}]

@@ -93,7 +93,7 @@ class HcMask:
 def mask_to_charset(hcmask):
     charset = set(hcmask.positions)
     hcset = []
-    for x in list(charset):
+    for x in charset:
         hcset.append(HcMask.get_character_class(x, classes=CHARACTER_CLASSES))
 
     if ']' in hcset:
@@ -167,10 +167,7 @@ def main():
         if cust:
             charsets[i] = parse_character_set(cust)
 
-    mask = args.mask
-
-    hcmask = parse_mask(mask, classes=charsets)
-
+    hcmask = parse_mask(args.mask, classes=charsets)
     regex = hcmask.to_regex(classes=charsets)
     regex = apply_match_mode(regex, args.mask_match_mode)
 
@@ -183,5 +180,5 @@ if __name__ == '__main__':
     try:
         main()
     except ParseException as e:
-        print(1, '{}: {}\n'.format(type(e).__name__, str(e)))
+        print('{}: {}\n'.format(type(e).__name__, str(e)))
         exit(1)
