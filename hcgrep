@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import sys
 from copy import copy
 
 
@@ -144,6 +145,22 @@ def apply_match_mode(regex, mode):
         raise Exception("Internal error: unknown match mode")
 
 
+def has_e_argument(argv):
+    argv = argv[1:]
+    if '-e' in argv or '--regexp' in argv:
+        return True
+    for x in argv:
+        if x.startswith('-e=') or x.startswith('--regexp='):
+            return True
+    return False
+
+
+def get_masks(args):
+    if hasattr(args, 'mask'):
+        return [args.mask]
+    return args.regexp
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run grep with a hashcat mask", allow_abbrev=False,
@@ -155,7 +172,11 @@ def main():
     for i in range(1, 5):
         i = str(i)
         parser.add_argument('--custom-charset' + i, '-' + i)
-    parser.add_argument('mask')
+
+    if has_e_argument(sys.argv):
+        parser.add_argument('--regexp', '-e', action='append', metavar='mask')
+    else:
+        parser.add_argument('mask')
 
     args, grep_args = parser.parse_known_args()
 
@@ -167,13 +188,17 @@ def main():
         if cust:
             charsets[i] = parse_character_set(cust)
 
-    hcmask = parse_mask(args.mask, classes=charsets)
-    regex = hcmask.to_regex(classes=charsets)
-    regex = apply_match_mode(regex, args.mask_match_mode)
+    masks = get_masks(args)
+
+    re_args = []
+    for m in masks:
+        hcmask = parse_mask(m, classes=charsets)
+        regex = hcmask.to_regex(classes=charsets)
+        re_args.extend(('-e', apply_match_mode(regex, args.mask_match_mode)))
 
     env = os.environ.copy()
     env['LC_ALL'] = 'C'
-    os.execlpe(GREP_EXECUTABLE, 'grep', regex, *grep_args, env)
+    os.execlpe(GREP_EXECUTABLE, 'grep', *re_args, *grep_args, env)
 
 
 if __name__ == '__main__':
