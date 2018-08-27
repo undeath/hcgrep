@@ -23,7 +23,7 @@ hcgrep works just like grep with hashcat masks. Most grep options work, altough 
 	  -h, --help            show this help message and exit
 	  --mask-match-mode {a,f,s,e}, --mm {a,f,s,e}
 							desired matching mode, [a]ny, [f]ull, [s]tart, [e]nd.
-							Default: f
+							Default: a
 	  --custom-charset1 CUSTOM_CHARSET1, -1 CUSTOM_CHARSET1
 	  --custom-charset2 CUSTOM_CHARSET2, -2 CUSTOM_CHARSET2
 	  --custom-charset3 CUSTOM_CHARSET3, -3 CUSTOM_CHARSET3
