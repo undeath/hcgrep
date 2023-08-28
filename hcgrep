@@ -59,7 +59,9 @@ class HcMask:
         for o, i in occurence_list:
             cclass = self.get_character_class(o, classes)
 
-            if cclass != '.' or o == '.':
+            if o == cclass == '^':
+                cclass = '[\\' + cclass + ']'
+            elif cclass != '.' or o == '.':
                 cclass = '[' + cclass + ']'
 
             if i == 1:
@@ -100,10 +102,12 @@ def mask_to_charset(hcmask):
         hcset.remove(']')
         hcset.insert(0, ']')
 
-    for c in '^-':
-        if c in hcset:
-            hcset.remove(c)
-            hcset.append(c)
+    if '^' in hcset:
+        hcset.remove('^')
+        hcset.append('\\^')
+    if '-' in hcset:
+        hcset.remove('-')
+        hcset.append('-')
 
     return ''.join(hcset)
 
